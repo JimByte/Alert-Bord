@@ -1,0 +1,5 @@
+Flask>=2.0
+jdatetime>=4.0.0
+waitress>=2.0.0
+Werkzeug>=2.0
+prometheus-flask-exporter>=0.20
