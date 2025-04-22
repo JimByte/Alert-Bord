@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title id="pageTitle">Alert Bord</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" integrity="sha512-xh6O/CkQoPOWDdYTDqeRdPCVd1SpvCA9XXcUnZS2FmJNp1coAFzvtCN9BmamE+4aHK8yyUHUSCcJHgXloTyT2A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    {# --- Navbar (Simplified) --- #}
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                 <i class="fas fa-tachometer-alt me-2"></i>Alert Bord
+            </a>
+            <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapseActions">
+                 <ul class="navbar-nav ms-auto mb-2 mb-md-0 align-items-center">
+                     <li class="nav-item">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Settings">
+                            <i class="fas fa-cog"></i> <span class="d-none d-lg-inline">Settings</span>
+                        </button>
+                     </li>
+                 </ul>
+            </div>
+             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapseActions" aria-controls="navbarCollapseActions" aria-expanded="false" aria-label="Toggle Actions">
+                 <span class="navbar-toggler-icon"></span>
+             </button>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                 <div class="position-sticky pt-3">
+                    <h6 class="sidebar-heading px-3 mt-1 mb-2"><span><i class="fas fa-layer-group me-2"></i>Groups</span></h6>
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('index', status=status_filter, search=search_term, severity=severity_filter, sort_by=sort_by, order=order) }}" class="list-group-item list-group-item-action py-2 {{ 'active' if not group_filter else '' }}" aria-current="{{ 'true' if not group_filter else 'false' }}"><i class="fas fa-globe fa-fw me-2"></i> All Alerts</a>
+                        {% for group in available_groups %}
+                        <a href="{{ url_for('index', group=group, status=status_filter, search=search_term, severity=severity_filter, sort_by=sort_by, order=order) }}" class="list-group-item list-group-item-action py-2 {{ 'active' if group_filter == group else '' }}" aria-current="{{ 'true' if group_filter == group else 'false' }}">
+                           {% set group_icon = 'fas fa-folder' %}{% set gl = group|lower %}{% if 'db' in gl or 'database' in gl or 'sql' in gl %} {% set group_icon = 'fas fa-database' %}{% elif 'net' in gl or 'network' in gl or 'firewall' in gl %} {% set group_icon = 'fas fa-network-wired' %}{% elif 'web' in gl or 'http' in gl or 'nginx' in gl or 'apache' in gl %} {% set group_icon = 'fas fa-window-maximize' %}{% elif 'node' in gl or 'host' in gl or 'system' in gl or 'server' in gl %} {% set group_icon = 'fas fa-server' %}{% elif 'kube' in gl or 'k8s' in gl or 'kubernetes' in gl %} {% set group_icon = 'fas fa-cubes' %}{% elif 'app' in gl or 'service' in gl %} {% set group_icon = 'fas fa-box-open' %}{% elif 'default' in gl %} {% set group_icon = 'fas fa-box' %}{% endif %}
+                           <i class="{{ group_icon }} fa-fw me-2"></i> {{ group }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </nav>
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content-area">
+                <!-- Filters and Title Row -->
+                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h5 mb-0"><i class="{{ title_icon }} me-2"></i> {% if group_filter %} Group: {{ group_filter }} {% else %} All Alerts {% endif %} <span class="badge bg-secondary rounded-pill ms-2 align-middle" title="Total alerts in this view">{{ alerts|length }}</span> {% if status_filter == 'active' %} <span class="badge bg-danger rounded-pill ms-1 align-middle">Active</span> {% elif status_filter == 'resolved' %} <span class="badge bg-success rounded-pill ms-1 align-middle">Resolved</span> {% elif status_filter == 'all' %} <span class="badge bg-info rounded-pill ms-1 align-middle text-dark">All</span> {% endif %} <button id="enableNotificationsBtn" class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" style="display: none;" title="Enable Browser Notifications"><i class="fas fa-bell small"></i></button> <span id="new-alert-indicator" class="badge bg-warning text-dark ms-2 align-middle" style="display: none;" title="New alerts received! Click anywhere or filter/ack to clear."><i class="fas fa-exclamation-triangle me-1 small"></i>New!</span></h1>
+                     <div class="btn-toolbar mb-0 ms-md-4"><div class="btn-group"><a href="{{ url_for('export_data', format='csv', status=status_filter, search=search_term, severity=severity_filter, group=group_filter, sort_by=sort_by, order=order) }}" class="btn btn-sm btn-outline-secondary" title="Export Current View as CSV"><i class="fas fa-file-csv me-1"></i> CSV</a><a href="{{ url_for('export_data', format='json', status=status_filter, search=search_term, severity=severity_filter, group=group_filter, sort_by=sort_by, order=order) }}" class="btn btn-sm btn-outline-secondary" title="Export Current View as JSON"><i class="fas fa-file-code me-1"></i> JSON</a></div></div>
+                </div>
+                <!-- Filter Controls Form -->
+                 <div class="filter-controls mb-3">
+                    <form method="GET" action="{{ url_for('index') }}">
+                        <input type="hidden" name="group" value="{{ group_filter }}"><input type="hidden" name="sort_by" value="{{ sort_by }}"><input type="hidden" name="order" value="{{ order }}">
+                        <select class="form-select form-select-sm" name="status" onchange="this.form.submit()" aria-label="Filter by status"><option value="active" {% if status_filter == 'active' %}selected{% endif %}>Status: Active</option><option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Status: Resolved</option><option value="all" {% if status_filter == 'all' %}selected{% endif %}>Status: All</option></select>
+                        <select class="form-select form-select-sm" name="severity" onchange="this.form.submit()" aria-label="Filter by severity"><option value="" {% if not severity_filter %}selected{% endif %}>Severity: All</option>{% for sev in severity_levels %}<option value="{{ sev }}" {% if severity_filter == sev %}selected{% endif %}>{{ sev.capitalize() }}</option>{% endfor %}</select>
+                        <input class="form-control form-control-sm flex-grow-1" type="search" placeholder="Search (Name, Msg, Labels, Comment...)" aria-label="Search alerts" name="search" value="{{ search_term }}">
+                        <button class="btn btn-sm btn-primary" type="submit" title="Apply Filters"><i class="fas fa-search me-1"></i> Filter</button>{% if search_term or severity_filter %}<a href="{{ url_for('index', group=group_filter, status=status_filter, sort_by=sort_by, order=order) }}" class="btn btn-sm btn-outline-secondary" title="Clear Search & Severity Filters"><i class="fas fa-times"></i> Clear</a>{% endif %}
+                    </form>
+                </div>
+                <!-- Hidden Timestamp Span -->
+                <span id="latest-alert-timestamp" data-timestamp="{{ alerts[0].timestamp if alerts else '' }}" style="display: none;"></span>
+                <!-- Alert Table -->
+                <div class="table-responsive">
+                     <table class="table table-hover table-sm small align-middle mb-0">
+                        <thead class="sticky-top">
+                            <tr>
+                                <th style="width: 130px;" class="text-start ps-3"><a href="{{ url_for('index', group=group_filter, status=status_filter, search=search_term, severity=severity_filter, sort_by='timestamp', order='desc' if sort_by == 'timestamp' and order == 'asc' else 'asc') }}">Timestamp <i class="sort-icon fas {{ 'fa-sort-up' if sort_by == 'timestamp' and order == 'asc' else ('fa-sort-down' if sort_by == 'timestamp' and order == 'desc' else 'fa-sort text-muted') }} ms-1"></i></a></th>
+                                <th style="width: 140px;" class="text-start"><a href="{{ url_for('index', group=group_filter, status=status_filter, search=search_term, severity=severity_filter, sort_by='group', order='asc' if sort_by == 'group' and order == 'desc' else 'desc') }}">Group <i class="sort-icon fas {{ 'fa-sort-up' if sort_by == 'group' and order == 'asc' else ('fa-sort-down' if sort_by == 'group' and order == 'desc' else 'fa-sort text-muted') }} ms-1"></i></a></th>
+                                <th style="width: 90px;" class="text-center"><a href="{{ url_for('index', group=group_filter, status=status_filter, search=search_term, severity=severity_filter, sort_by='severity', order='asc' if sort_by == 'severity' and order == 'desc' else 'desc') }}">Severity <i class="sort-icon fas {{ 'fa-sort-up' if sort_by == 'severity' and order == 'asc' else ('fa-sort-down' if sort_by == 'severity' and order == 'desc' else 'fa-sort text-muted') }} ms-1"></i></a></th>
+                                <th class="message-col text-start"><a href="{{ url_for('index', group=group_filter, status=status_filter, search=search_term, severity=severity_filter, sort_by='alertname', order='asc' if sort_by == 'alertname' and order == 'desc' else 'desc') }}">Alert / Details <i class="sort-icon fas {{ 'fa-sort-up' if sort_by == 'alertname' and order == 'asc' else ('fa-sort-down' if sort_by == 'alertname' and order == 'desc' else 'fa-sort text-muted') }} ms-1"></i></a></th>
+                                <th style="width: 85px;" class="text-center pe-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table-body">
+                            {% for alert in alerts %}
+                            <tr id="alert-row-{{ alert.id }}" class="alert-row {% if alert.alertmanager_status == 'resolved' %}status-resolved{% elif alert.acknowledged %}status-acknowledged severity-{{ alert.severity|lower|default('unknown') }}{% else %}status-firing severity-{{ alert.severity|lower|default('unknown') }}{% endif %}" data-alert-id="{{ alert.id }}">
+
+                                {# === ستون زمان (اصلاح شده و درست) === #}
+                                <td class="timestamp-col text-start ps-3"
+                                    title="ID: {{ alert.id }} | Full Timestamp: {{ alert.timestamp }} | Resolved: {{ alert.resolved_at if alert.resolved_at else 'N/A' }} | Ack: {{ alert.acknowledged_at if alert.acknowledged_at else 'N/A' }}">
+                                    <span class="gregorian-date d-block" title="Gregorian Date">
+                                        {{ alert.timestamp[:10] if alert.timestamp else 'N/A' }}
+                                    </span>
+                                    <span class="jalali-date text-muted d-block" title="Jalali Date">
+                                        {{ alert.timestamp | to_jalali('%Y/%m/%d', convert_to_jalali=True) }}
+                                    </span>
+                                    <span class="alert-time text-muted d-block" title="Time">
+                                        ({{ alert.timestamp | to_jalali('%H:%M:%S', convert_to_jalali=False) }})
+                                    </span>
+                                    {% if alert.acknowledged and alert.acknowledged_at %}
+                                        <span class="d-block text-muted small fst-italic mt-1" title="Acknowledged: {{ alert.acknowledged_at | to_jalali('%Y/%m/%d %H:%M:%S', True)}}">
+                                            <i class="fas fa-user-check text-success"></i> {{ alert.acknowledged_at | to_jalali('%H:%M', False) }}
+                                        </span>
+                                    {% elif alert.alertmanager_status == 'resolved' and alert.resolved_at %}
+                                        <span class="d-block text-muted small fst-italic mt-1" title="Resolved: {{ alert.resolved_at | to_jalali('%Y/%m/%d %H:%M:%S', True) }}">
+                                            <i class="fas fa-check-circle text-success"></i> {{ alert.resolved_at | to_jalali('%H:%M', False) }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                {# === ستون گروه (اضافه شده) === #}
+                                <td class="text-start align-middle">{{ alert.alert_group | default('Default') }}</td>
+
+                                {# === ستون شدت (اضافه شده) === #}
+                                <td class="text-center align-middle">
+                                    <span class="badge severity-badge severity-badge-{{ alert.severity|lower|default('unknown') }}" title="Severity: {{ alert.severity }}">{{ alert.severity }}</span>
+                                </td>
+
+                                {# === ستون پیام/جزئیات (اضافه شده - با نمایش لیبل‌ها بیرون) === #}
+                                <td class="message-col text-start">
+                                    <div class="alert-message-text mb-2">{{ alert.message }}</div>
+                                    {% set alertname = alert.alertname or alert.alertmanager_labels.get('alertname') %}{% if alertname %}<div class="small text-muted alert-name mb-2" title="Alert Name: {{ alertname }}"><i class="fas fa-tag me-1"></i> Name: {{ alertname }}</div>{% endif %}
+                                    {% set has_labels = alert.alertmanager_labels and (alert.alertmanager_labels | length > 0) %}{% if has_labels %}<div class="alert-labels mt-2 pt-1 border-top border-dashed mb-2"><strong class="text-muted small d-block mb-1"><i class="fas fa-tags me-1"></i> Labels:</strong>{% for key, value in alert.alertmanager_labels.items() | sort %}{% set excluded_keys = ['severity', 'alertgroup', 'alertname', 'job'] %}{% if key not in excluded_keys and value %}<span class="badge label-badge" title="{{ key }}={{ value }}"><span class="label-key">{{ key }}</span>=<span class="label-value">{{ value }}</span></span>{% endif %}{% endfor %}</div>{% endif %}
+                                    {% if alert.acknowledged and alert.acknowledge_comment %}<div class="mt-2 pt-1 border-top border-dashed alert-ack-comment"><span class="text-muted small fw-bold"><i class="fas fa-comment-dots me-1"></i> Ack Comment:</span><div class="ms-2 fst-italic">"{{ alert.acknowledge_comment }}"{% if alert.acknowledged_by %}<span class="text-muted small ms-1">- {{ alert.acknowledged_by }}</span>{% endif %}</div></div>{% endif %}
+                                    {% set has_annotations = alert.alertmanager_annotations and (alert.alertmanager_annotations | length > 0) %}{% if has_annotations %}<div class="mt-2 pt-1 {% if not has_labels and (not alert.acknowledged or not alert.acknowledge_comment) %}border-top border-dashed{% endif %}"><a class="small text-decoration-none" data-bs-toggle="collapse" href="#details-{{ alert.id }}" role="button" aria-expanded="false" aria-controls="details-{{ alert.id }}"><i class="fas fa-chevron-right me-1"></i> Annotations</a><div class="collapse mt-2" id="details-{{ alert.id }}"><div class="alert-annotations"><strong class="text-muted small d-block mb-1"><i class="fas fa-sticky-note me-1"></i> Annotations:</strong>{% set annotations_shown = [] %}{% for key, value in alert.alertmanager_annotations.items() | sort %}{% set is_main_message = (key == 'summary' or key == 'description') and (value in alert.message) %}{% if not is_main_message and value and key not in annotations_shown %}<div class="ms-2 annotation-item"><strong class="text-muted annotation-key">{{ key }}:</strong> <span class="annotation-value">{{ value }}</span></div>{% set _ = annotations_shown.append(key) %}{% endif %}{% endfor %}</div></div></div>{% endif %}
+                                </td>
+
+                                {# === ستون اکشن (اصلاح شده و درست) === #}
+                                <td class="text-center align-middle pe-3">
+                                    <div class="ack-container">
+                                    {% if alert.alertmanager_status == 'firing' %}
+                                        {% if not alert.acknowledged %}<button class="btn btn-sm btn-outline-success ack-button w-100" data-alert-id="{{ alert.id }}" title="Acknowledge this alert"><i class="fas fa-check"></i> Ack</button>
+                                        {% else %}<span class="ack-indicator text-success w-100" data-bs-toggle="tooltip" data-bs-placement="left" title="Acknowledged {% if alert.acknowledged_by %}by: {{ alert.acknowledged_by }} {% endif %}at {{ alert.acknowledged_at | to_jalali('%Y/%m/%d %H:%M') }}{% if alert.acknowledge_comment %} | Comment: {{ alert.acknowledge_comment[:50] }}{% if alert.acknowledge_comment|length > 50 %}...{% endif %}{% endif %}"><i class="fas fa-user-check"></i> Seen</span>{% endif %}
+                                    {% elif alert.alertmanager_status == 'resolved' %}<span class="resolved-indicator text-muted w-100" title="Alert resolved at {{ alert.resolved_at | to_jalali('%Y/%m/%d %H:%M')}}"><i class="fas fa-check-circle text-success"></i>Resolved</span>{% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            {# No alerts row #}
+                            <tr><td colspan="5" class="text-center text-muted py-5"><div class="display-6 text-secondary mb-2"><i class="fas fa-check-circle"></i></div><p class="lead mb-0">No alerts found.</p><small>There are no alerts matching the current filters.</small></td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div> <!-- /table-responsive -->
+            </main>
+        </div> <!-- /row -->
+    </div> <!-- /container-fluid -->
+
+    <!-- Hidden Audio Player -->
+    <audio id="notificationSound" src="{{ url_for('static', filename='notification.mp3') }}" preload="auto" style="display: none;"></audio>
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="settingsModalLabel"><i class="fas fa-cog me-2"></i>Dashboard Settings</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><form id="settingsForm"><div class="modal-body"><div id="settingsAlert" class="alert alert-dismissible fade show" role="alert" style="display: none;"><span id="settingsAlertMessage"></span><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div><div class="mb-3"><label for="retentionSlider" class="form-label">Max Alerts Retention:</label><div class="d-flex align-items-center"><input type="range" class="form-range flex-grow-1" min="100" max="30000" step="100" id="retentionSlider" name="max_alerts_retention" value="{{ current_retention | default(5000) }}"><span id="retentionValue" class="badge bg-secondary ms-3">{{ current_retention | default(5000) }}</span></div><div class="form-text">Max alerts in DB. Older pruned on new alerts/restart.</div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary" id="saveSettingsBtn"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Save Settings</button></div></form></div></div></div>
+    <!-- JS Includes -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
